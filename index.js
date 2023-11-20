@@ -9,7 +9,7 @@ const app = express();
 const port = 5000;
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://husseinalkattash2023:IwIWfM53o3xSBUpH@cluster0.9idd3oa.mongodb.net/');
+mongoose.connect('mongodb://127.0.0.1:27017/ecommerce');
 
 // Create a mongoose schema for the product
 const productSchema = new mongoose.Schema({
@@ -138,7 +138,14 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+  console.log('Connected to MongoDB');
+
+  // Start the server
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
 });
 
