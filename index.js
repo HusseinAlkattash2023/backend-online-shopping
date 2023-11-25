@@ -4,9 +4,15 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = 5000;
+
+// Enable CORS for all routes
+app.use(cors());
 
 // Connect to MongoDB
 mongoose.connect('mongodb://127.0.0.1:27017/ecommerce');
@@ -22,6 +28,24 @@ const productSchema = new mongoose.Schema({
 });
 
 const Product = mongoose.model('Product', productSchema);
+
+// Define user schema
+const userSchema = new mongoose.Schema({
+  username: { type: String, unique: true, required: true },
+  password: { type: String, required: true },
+});
+
+// Hash password before saving to database
+userSchema.pre('save', async function (next) {
+  const user = this;
+  if (!user.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(user.password, salt);
+  user.password = hashedPassword;
+  next();
+});
+const User = mongoose.model('User', userSchema);
+
 
 app.use(bodyParser.json());
 
@@ -149,3 +173,41 @@ db.once('open', () => {
   });
 });
 
+
+
+// Register endpoint
+app.post('/register', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = new User({ username, password });
+    await user.save();
+    res.status(201).json({ message: 'Registration successful' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+
+// Login endpoint
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      throw new Error('Invalid password');
+    }
+
+    const token = jwt.sign({ userId: user._id }, 'your-secret-key', { expiresIn: '1h' });
+
+    res.json({ token });
+  } catch (error) {
+    res.status(401).json({ error: error.message });
+  }
+});
